@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <cstring>
+#include <cstdlib>
 
 
 static constexpr uint8_t square_procedure_code[] = {
@@ -33,12 +34,13 @@ void init_procedures() {
 
 
 int main(int argc, char ** argv) {
-    if (argc != 1) {
-        std::cerr << "No arguments currently allowed." << std::endl;
+    if (argc != 2) {
+        std::cerr << "USAGE: " << argv[0] << " to_square" << std::endl;
         exit(1);
     }
 
     init_procedures();
 
-    std::cout << square_procedure(5) << std::endl;
+    int to_square = std::atoi(argv[1]);
+    std::cout << square_procedure(to_square) << std::endl;
 }
