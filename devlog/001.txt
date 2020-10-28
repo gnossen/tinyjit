@@ -1,0 +1,19 @@
+Okay, so I kind of just want to try something. No clue how far it's going to
+get. I just want to do a little bit of JIT to see what it's like.
+
+I'm going to take a couple of baby steps. I'll just start by writing functions
+that take one unsigned integer as input and return one unsigned integer as
+output. This means that I won't have to spend a bunch of time at first on ABI
+considerations. Let's start by writing a squaring function.
+
+The assembly will look like this:
+
+```
+   0:	55                   	push   %rbp
+   1:	48 89 e5             	mov    %rsp,%rbp
+   4:	89 7d fc             	mov    %edi,-0x4(%rbp)
+   7:	8b 45 fc             	mov    -0x4(%rbp),%eax
+   a:	0f af c0             	imul   %eax,%eax
+   d:	5d                   	pop    %rbp
+   e:	c3                   	retq
+```
