@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <sstream>
+#include <map>
 
 namespace gnossen {
 namespace fsm {
@@ -13,17 +14,31 @@ FSMInterface::ToDotGraph() const {
     ss << "digraph FSM {" << std::endl;
     for (FsmState* state : GetStates()) {
         std::string state_id(std::to_string(StateIdentifier(state)));
+        std::map<unsigned int, std::list<std::string>> edges;
         for (auto transition : GetTransitions(state)) {
-            FsmState* out_state = transition.first;
+            unsigned int out_id = StateIdentifier(transition.first);
             char letter = transition.second;
             std::string transition_str;
             if (letter == '\0') {
-                transition_str = "\\0";
+                transition_str = "\\\\0";
             } else {
                 transition_str = letter;
             }
-            ss << "  " << state_id << " -> " << StateIdentifier(out_state) <<
-               " [ label=\"" << transition_str << "\" ]" << std::endl;
+            edges[out_id].push_back(transition_str);
+        }
+        for(const auto& edge_data : edges) {
+            unsigned int out_id = edge_data.first;
+            const auto& letters = edge_data.second;
+            ss << "  " << state_id << " -> " << out_id << " [ label=\" ";
+            auto it = letters.begin();
+            ss << *it;
+            ++it;
+            while (it != letters.end()) {
+                ss << ",";
+                ss << *it;
+                ++it;
+            }
+            ss << "\" ]" << std::endl;
         }
     }
     ss << "}" << std::endl;
