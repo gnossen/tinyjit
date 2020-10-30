@@ -19,7 +19,7 @@ static std::string TranslateLetter(char letter) {
 
 // TODO: Think about omitting the failure transitions.
 std::string
-FSMInterface::ToDotGraph() const {
+Fsm::ToDotGraph() const {
     std::stringstream ss;
     ss << "digraph FSM {" << std::endl;
     for (FsmState* state : GetStates()) {

@@ -37,73 +37,39 @@ private:
 
 };
 
-// A Finite State Machine.
-class FSMInterface {
-public:
-    FSMInterface() = default;
-    virtual ~FSMInterface() = default;
-
-    // Mutating methods.
-    virtual FsmState* AddState() = 0;
-
-    // Adds a deterministic transition from one state to another.
-    virtual const void AddTransition(FsmState* from,
-                                          FsmState* to,
-                                          char letter) = 0;
-
-    // Adds a nondeterministic transition from one state to another.
-    // Following this transition does not consume a character.
-    virtual const void AddNonDeterministicTransition(FsmState* from,
-                                                     FsmState* to) = 0;
-
-    // Adds a determinisic transition for all letters not already
-    // represented by a transition to the given state. No more transitions
-    // may be added after this method has been called.
-    virtual const void AddTransitionForRemaining(FsmState* from,
-                                                 FsmState* to) = 0;
-
-
-    // TODO: Supply an interface to add multiple letters to the
-    // transition?
-
-    // Read methods.
-
-    virtual const std::vector<char>& GetAlphabet() const = 0;
-
-    // TODO: Consider an iterator-based interface.
-    virtual std::list<FsmState*> GetStates() const = 0;
-    virtual std::list<std::pair<FsmState*, EdgeLabel>>
-        GetTransitions(FsmState*) const = 0;
-
-    virtual unsigned int StateIdentifier(FsmState*) const = 0;
-
-    // These three states are automatically created without intervention
-    // from the caller.
-    virtual FsmState* GetStartState() const = 0;
-    virtual FsmState* GetSuccessState() const = 0;
-    virtual FsmState* GetFailureState() const = 0;
-
-    // Generates a dot graph corresponding to this FSM.
-    std::string ToDotGraph() const;
-};
-
-class Fsm : public FSMInterface {
+class Fsm {
 public:
     explicit Fsm(const std::vector<char>& alphabet);
     ~Fsm() {}
 
     Fsm(const Fsm&);
 
+    // Mutating methods.
+
     FsmState* AddState() ;
+
+    // Adds a deterministic transition from one state to another.
     const void AddTransition(FsmState* from,
                                       FsmState* to,
                                       char letter);
 
+
+    // Adds a nondeterministic transition from one state to another.
+    // Following this transition does not consume a character.
     const void AddNonDeterministicTransition(FsmState* from,
                                              FsmState* to);
 
+    // Adds a determinisic transition for all letters not already
+    // represented by a transition to the given state. No more transitions
+    // may be added after this method has been called.
     const void AddTransitionForRemaining(FsmState* from,
                                          FsmState* to);
+
+
+    // TODO: Supply an interface to add multiple letters to the
+    // transition?
+
+    // Read methods.
 
     const std::vector<char>& GetAlphabet() const;
 
@@ -113,9 +79,14 @@ public:
 
     unsigned int StateIdentifier(FsmState*) const;
 
+    // These three states are automatically created without intervention
+    // from the caller.
     FsmState* GetStartState() const { return start_state_; }
     FsmState* GetSuccessState() const { return success_state_; }
     FsmState* GetFailureState() const { return failure_state_; }
+
+    // Generates a dot graph corresponding to this FSM.
+    std::string ToDotGraph() const;
 
 private:
     struct State {
