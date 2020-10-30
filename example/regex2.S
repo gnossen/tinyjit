@@ -3,7 +3,7 @@
 .type regex, %function
 
 
-// c(a|b)c.
+// c(a|b)*c.
 regex:
     push    %rbp
     mov     %rsp, %rbp
@@ -16,7 +16,7 @@ regex:
     // State 2
 .state_2:
     mov     $0x61, %al // 'a'
-    scasb
+    repe scasb
     dec     %rdi
 
     // State 3
