@@ -7,6 +7,14 @@ namespace fsm {
 
 typedef struct FsmState FsmState;
 
+struct EdgeLabel {
+    bool empty_edge;
+    char edge_label;
+
+    EdgeLabel() : empty_edge(true), edge_label() {}
+    EdgeLabel(char edge_label) : empty_edge(false), edge_label(edge_label) {}
+};
+
 // A Finite State Machine.
 class FSMInterface {
 public:
@@ -19,6 +27,9 @@ public:
                                           FsmState* to,
                                           char letter) = 0;
 
+    virtual const void AddNonDeterministicTransition(FsmState* from,
+                                                     FsmState* to) = 0;
+
     // TODO: Supply an interface to add multiple letters to the
     // transition?
 
@@ -26,7 +37,7 @@ public:
 
     // TODO: Consider an iterator-based interface.
     virtual std::list<FsmState*> GetStates() const = 0;
-    virtual std::list<std::pair<FsmState*, char>>
+    virtual std::list<std::pair<FsmState*, EdgeLabel>>
         GetTransitions(FsmState*) const = 0;
 
     virtual unsigned int StateIdentifier(FsmState*) const = 0;
@@ -51,8 +62,11 @@ public:
                                       FsmState* to,
                                       char letter);
 
+    const void AddNonDeterministicTransition(FsmState* from,
+                                             FsmState* to);
+
     std::list<FsmState*> GetStates() const;
-    std::list<std::pair<FsmState*, char>>
+    std::list<std::pair<FsmState*, EdgeLabel>>
         GetTransitions(FsmState*) const;
 
     unsigned int StateIdentifier(FsmState*) const;
@@ -64,7 +78,7 @@ public:
 private:
     struct State {
         unsigned int id;
-        std::list<std::pair<FsmState*, char>> edges_out;
+        std::list<std::pair<FsmState*, EdgeLabel>> edges_out;
 
         State(unsigned int id);
     };
@@ -78,10 +92,6 @@ private:
     FsmState* success_state_;
     FsmState* failure_state_;
     unsigned int next_id_;
-};
-
-class Nfsm {
-
 };
 
 } // end namespace fsm

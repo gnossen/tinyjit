@@ -17,12 +17,16 @@ FSMInterface::ToDotGraph() const {
         std::map<unsigned int, std::list<std::string>> edges;
         for (auto transition : GetTransitions(state)) {
             unsigned int out_id = StateIdentifier(transition.first);
-            char letter = transition.second;
+            EdgeLabel label = transition.second;
             std::string transition_str;
-            if (letter == '\0') {
-                transition_str = "\\\\0";
+            if (label.empty_edge) {
+                transition_str = "eps.";
             } else {
-                transition_str = letter;
+                if (label.edge_label == '\0') {
+                    transition_str = "\\\\0";
+                } else {
+                    transition_str = label.edge_label;
+                }
             }
             edges[out_id].push_back(transition_str);
         }
@@ -73,7 +77,14 @@ const void Fsm::AddTransition(FsmState* from,
                                   char letter)
 {
     Fsm::State* from_state = reinterpret_cast<Fsm::State*>(from);
-    from_state->edges_out.emplace_back(to, letter);
+    from_state->edges_out.emplace_back(to, EdgeLabel(letter));
+}
+
+const void Fsm::AddNonDeterministicTransition(FsmState* from,
+                                              FsmState* to)
+{
+    Fsm::State* from_state = reinterpret_cast<Fsm::State*>(from);
+    from_state->edges_out.emplace_back(to, EdgeLabel());
 }
 
 std::list<FsmState*>
@@ -82,7 +93,7 @@ Fsm::GetStates() const {
 }
 
 // TODO: Expensive copy happening here. Iterators, son.
-std::list<std::pair<FsmState*, char>>
+std::list<std::pair<FsmState*, EdgeLabel>>
 Fsm::GetTransitions(FsmState* state) const {
     return reinterpret_cast<Fsm::State*>(state)->edges_out;
 }

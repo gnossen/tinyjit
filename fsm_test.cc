@@ -66,7 +66,9 @@ TEST(FsmTest, CanBuild) {
 
   for (FsmState* state : fsm.GetStates()) {
     for (auto transition : fsm.GetTransitions(state)) {
-      observed_transitions[state].push_back(transition);
+      EXPECT_FALSE(transition.second.empty_edge);
+      observed_transitions[state].emplace_back(transition.first,
+                                               transition.second.edge_label);
     }
   }
 
