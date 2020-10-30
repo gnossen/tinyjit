@@ -16,7 +16,7 @@ regex:
     // State 2
 .state_2:
     mov     $0x61, %al // 'a'
-    repe scasb
+    scasb
     dec     %rdi
 
     // State 3
