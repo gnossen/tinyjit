@@ -69,7 +69,7 @@ arrange them using topological sort and maybe link them together with jump
 instructions. And since there are jumps, we'll probably have to deal with making
 this position independent. :poggers:
 
-Alright, let's try another one. How about "c(a|b)c." with the alphabet {a, b,
+Alright, let's try another one. How about "c(a|b)*c." with the alphabet {a, b,
 c}.
 
 ```
@@ -134,3 +134,7 @@ a jump) and any other character resulting in another state.
 There are some cases where I'd like to deduplicate. For example, in the case of
 an "or", I only need to load from the string to a register once for multiple
 states. It'll be interesting to figure out how I get that to work.
+
+So now that I have a decent idea of what the input and output are going to have
+to look like, I'm starting in on implementing the first chunk. I know I need a
+representation for finite state machines.

@@ -7,6 +7,8 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "fsm.h"
+
 
 static constexpr uint8_t square_procedure_code[] = {
   0x55,             /* push %rbp */
