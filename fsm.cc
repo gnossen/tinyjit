@@ -7,6 +7,16 @@
 namespace gnossen {
 namespace fsm {
 
+static constexpr size_t kMaxElseSize = 5;
+
+static std::string TranslateLetter(char letter) {
+    if (letter == '\0') {
+        return "\\\\0";
+    } else {
+        return std::string(1, letter);
+    }
+}
+
 // TODO: Think about omitting the failure transitions.
 std::string
 FSMInterface::ToDotGraph() const {
@@ -15,18 +25,28 @@ FSMInterface::ToDotGraph() const {
     for (FsmState* state : GetStates()) {
         std::string state_id(std::to_string(StateIdentifier(state)));
         std::map<unsigned int, std::list<std::string>> edges;
+        std::unordered_set<char> remaining_letters;
+        std::copy(GetAlphabet().begin(), GetAlphabet().end(),
+                std::inserter(remaining_letters, remaining_letters.begin()));
         for (auto transition : GetTransitions(state)) {
             unsigned int out_id = StateIdentifier(transition.first);
             EdgeLabel label = transition.second;
             std::string transition_str;
-            if (label.empty_edge) {
+            if (label.remainder) {
+                // Only enumerate all others if it's reasonably small.
+                if (GetAlphabet().size() <= kMaxElseSize) {
+                    for (char remaining_letter : remaining_letters) {
+                        edges[out_id].push_back(TranslateLetter(remaining_letter));
+                    }
+                } else {
+                    edges[out_id].push_back("else");
+                }
+                break;
+            } else if (label.empty_edge) {
                 transition_str = "eps.";
             } else {
-                if (label.edge_label == '\0') {
-                    transition_str = "\\\\0";
-                } else {
-                    transition_str = label.edge_label;
-                }
+                remaining_letters.erase(label.edge_label);
+                transition_str = TranslateLetter(label.edge_label);
             }
             edges[out_id].push_back(transition_str);
         }
@@ -52,7 +72,8 @@ FSMInterface::ToDotGraph() const {
 Fsm::State::State(unsigned int id) :
     id(id), edges_out() {}
 
-Fsm::Fsm() :
+Fsm::Fsm(const std::vector<char>& alphabet) :
+    alphabet_(alphabet),
     states_(),
     start_state_(nullptr),
     success_state_(nullptr),
@@ -106,6 +127,18 @@ const void Fsm::AddNonDeterministicTransition(FsmState* from,
     from_state->edges_out.emplace_back(to, EdgeLabel());
 }
 
+const void Fsm::AddTransitionForRemaining(FsmState* from,
+                                          FsmState* to)
+{
+    Fsm::State* from_state = reinterpret_cast<Fsm::State*>(from);
+    from_state->edges_out.emplace_back(to, EdgeLabel::Remainder());
+}
+
+const std::vector<char>&
+Fsm::GetAlphabet() const {
+    return alphabet_;
+}
+
 std::list<FsmState*>
 Fsm::GetStates() const {
     return state_pointers_;
@@ -122,7 +155,7 @@ unsigned int Fsm::StateIdentifier(FsmState* state) const {
 }
 
 Fsm ToBinarizedNfsm(Fsm& fsm, const std::vector<char>& alphabet) {
-   return Fsm();
+   return Fsm(alphabet);
 }
 
 } // end namespace fsm

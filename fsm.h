@@ -1,6 +1,7 @@
 #include <string>
 #include <list>
 #include <utility>
+#include <unordered_set>
 #include <vector>
 
 namespace gnossen {
@@ -9,11 +10,31 @@ namespace fsm {
 typedef struct FsmState FsmState;
 
 struct EdgeLabel {
+    // If set, this is a nondeterministic transition, consuming no input
+    // characters. Mutually exlusive with the other two fields of this struct.
     bool empty_edge;
+
+    // If set, this represents all remaining characters not already represented
+    // in the list of out edges for this state. Mutually exclusive with the
+    // other two fields in this struct.
+    bool remainder;
+
+    // The label for this edge -- an actual character.
     char edge_label;
 
-    EdgeLabel() : empty_edge(true), edge_label() {}
-    EdgeLabel(char edge_label) : empty_edge(false), edge_label(edge_label) {}
+    EdgeLabel() : empty_edge(true), remainder(false), edge_label() {}
+    EdgeLabel(char edge_label) : empty_edge(false), remainder(false), edge_label(edge_label) {}
+
+    static EdgeLabel Remainder() {
+        return EdgeLabel {false, true, '\0'};
+    }
+
+private:
+    EdgeLabel(bool empty_edge, bool remainder, char edge_label) :
+        empty_edge(empty_edge),
+        remainder(remainder),
+        edge_label(edge_label) {}
+
 };
 
 // A Finite State Machine.
@@ -24,17 +45,30 @@ public:
 
     // Mutating methods.
     virtual FsmState* AddState() = 0;
+
+    // Adds a deterministic transition from one state to another.
     virtual const void AddTransition(FsmState* from,
                                           FsmState* to,
                                           char letter) = 0;
 
+    // Adds a nondeterministic transition from one state to another.
+    // Following this transition does not consume a character.
     virtual const void AddNonDeterministicTransition(FsmState* from,
                                                      FsmState* to) = 0;
+
+    // Adds a determinisic transition for all letters not already
+    // represented by a transition to the given state. No more transitions
+    // may be added after this method has been called.
+    virtual const void AddTransitionForRemaining(FsmState* from,
+                                                 FsmState* to) = 0;
+
 
     // TODO: Supply an interface to add multiple letters to the
     // transition?
 
     // Read methods.
+
+    virtual const std::vector<char>& GetAlphabet() const = 0;
 
     // TODO: Consider an iterator-based interface.
     virtual std::list<FsmState*> GetStates() const = 0;
@@ -55,7 +89,7 @@ public:
 
 class Fsm : public FSMInterface {
 public:
-    Fsm();
+    explicit Fsm(const std::vector<char>& alphabet);
     ~Fsm() {}
 
     Fsm(const Fsm&);
@@ -67,6 +101,11 @@ public:
 
     const void AddNonDeterministicTransition(FsmState* from,
                                              FsmState* to);
+
+    const void AddTransitionForRemaining(FsmState* from,
+                                         FsmState* to);
+
+    const std::vector<char>& GetAlphabet() const;
 
     std::list<FsmState*> GetStates() const;
     std::list<std::pair<FsmState*, EdgeLabel>>
@@ -85,6 +124,8 @@ private:
 
         State(unsigned int id);
     };
+
+    const std::vector<char> alphabet_;
 
     std::list<State> states_;
 
