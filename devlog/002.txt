@@ -1,0 +1,136 @@
+10/29/2020
+
+Okay, onto the next thing. I've figured out something cool I want to do with
+JIT: regexes.
+
+The general idea is to translate the regex into a deterministic finite
+automaton. Then, we take that DFA and minimize it. Finally, we convert the
+minimal DFA to machine code.
+
+For starters, we can skip the minimization step and add it as an optimization
+pass later. I've implemented this before at https://github.com/gnossen/complang
+and it's not trivial.
+
+Okay, let's think about some simple examples. We'll use the alphabet {a, b}.
+What would "ba*b*a" look like in assembly?
+
+Well, we'd have a graph that looks like this.
+
+Actually, wow. It's basically impossible to do an ascii directed graph the way I
+want to. That's disappointing.
+
+<INSERT DOT GRAPH FOR THIS>
+
+
+```
+    push    %rbp
+    mov     %rsp, %rbp  ; manage the stack
+
+    ; State 1
+    movb    $0x62, %al  ; put 'a' into %al
+    scasb               ; compare %edi with %al
+    jnz     .failure   ; fail if not equal
+
+    ; State 2
+    movb    $0x61, %al  ; put 'b' into %al
+    repe scasb          ; match as many 'b's as possible
+    dec     %edi        ; rewind %edi to the cause
+    movb    $0x62, %al  ; compare with 'b'
+    scasb
+    jnz      .failure   ; fail if not equal
+
+    ; State 3
+    movb     $0x62, %al ; technically redundant, could remove
+    repe scasb
+    dec     %edi        ; rewind %edi to the cause
+    movb    $0x61, %al  ; compare with 'a'
+    scasb
+    jnz     .failure    ; fail if not equal
+
+    ; State 4
+    mov     [%edi], %edi
+    test    %edi, %edi
+    jnz     .failure
+
+    ; Stage 5
+    mov     $0x1, %rax
+    retq
+
+.failure:
+    ; State 6
+    mov     $0x0, %rax
+    retq
+```
+
+So I had a couple of thoughts while writing all of that assembly. The first is
+that this is reducible down into stages that are relatively small sections of
+code corresponding to a node in the graph. We're probably going to have to
+arrange them using topological sort and maybe link them together with jump
+instructions. And since there are jumps, we'll probably have to deal with making
+this position independent. :poggers:
+
+Alright, let's try another one. How about "c(a|b)c." with the alphabet {a, b,
+c}.
+
+```
+    push    %rbp
+    mov     %rsp, %bp
+
+    ; State 1
+    mov     $0x63, %al  ; 'c'
+    scasb
+    jnz     .failure
+
+    ; State 2
+.state_2:
+    mov     $0x61, %al ; 'a'
+    repe scasb
+    dec     %edi
+
+    ; State 3
+    mov     $0x62, %al ; 'b'
+    scasb
+    jz      .state_2
+    dec     %edi
+
+    ; State 4
+    mov     $0x63, %al ; 'c'
+    scasb
+    jnz    .failure
+
+    ; State 5
+    mov     %al, [%edi]
+    cmp     $0x61, %al
+    jz      .state_8
+
+    ; State 6
+    cmp     $0x62, %al ; depending on the mov in state 5
+    jz      .state_8
+
+    ; State 7
+    cmp     $0x63, %al
+    jnz     .failure
+    inc     %edi
+
+    ; State 8
+    mov     [%edi], %eax
+    test    %eax
+    jnz     .failure
+
+    ; State 9
+    mov     $0x1, %rax
+    retq
+
+.failure:
+    ; State 10
+    xor %eax, %eax
+    ret
+```
+
+Okay, I'm ready to put it a little bit more precisely. Each state deals with two
+possibilities: one specific character leading to a new state (which may require
+a jump) and any other character resulting in another state.
+
+There are some cases where I'd like to deduplicate. For example, in the case of
+an "or", I only need to load from the string to a register once for multiple
+states. It'll be interesting to figure out how I get that to work.
