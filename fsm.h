@@ -1,6 +1,7 @@
 #include <string>
 #include <list>
 #include <utility>
+#include <vector>
 
 namespace gnossen {
 namespace fsm {
@@ -57,6 +58,8 @@ public:
     Fsm();
     ~Fsm() {}
 
+    Fsm(const Fsm&);
+
     FsmState* AddState() ;
     const void AddTransition(FsmState* from,
                                       FsmState* to,
@@ -94,5 +97,7 @@ private:
     unsigned int next_id_;
 };
 
+Fsm ToBinarizedNfsm(Fsm& fsm, const std::vector<char>& alphabet);
+
 } // end namespace fsm
-} // end namespace gnossen
+} // end namespace gnosse

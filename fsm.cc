@@ -64,6 +64,25 @@ Fsm::Fsm() :
     failure_state_ = AddState();
 }
 
+Fsm::Fsm(const Fsm& other) :
+    states_(other.states_),
+    state_pointers_(),
+    start_state_(nullptr),
+    success_state_(nullptr),
+    failure_state_(nullptr),
+    next_id_(other.next_id_)
+{
+    auto it = states_.begin();
+    start_state_ = reinterpret_cast<FsmState*>(&(*it));
+    ++it;
+    success_state_ = reinterpret_cast<FsmState*>(&(*it));
+    ++it;
+    failure_state_ = reinterpret_cast<FsmState*>(&(*it));
+    for (auto& state : states_) {
+        state_pointers_.push_back(reinterpret_cast<FsmState*>(&state));
+    }
+}
+
 FsmState*
 Fsm::AddState() {
     states_.emplace_back(next_id_++);
@@ -102,6 +121,9 @@ unsigned int Fsm::StateIdentifier(FsmState* state) const {
     return reinterpret_cast<Fsm::State*>(state)->id;
 }
 
+Fsm ToBinarizedNfsm(Fsm& fsm, const std::vector<char>& alphabet) {
+   return Fsm();
+}
 
 } // end namespace fsm
 } // end namespace gnossen
