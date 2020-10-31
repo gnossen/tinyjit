@@ -17,20 +17,94 @@ static std::string TranslateLetter(char letter) {
     }
 }
 
+Fsm::State::State(unsigned int id) :
+    id(id), edges_out() {}
+
+Fsm::Fsm(const std::vector<char>& alphabet) :
+    alphabet_(alphabet),
+    states_(),
+    next_id_(0)
+{
+    // Create start, success, and failure states.
+    for (size_t i = 0; i < 3; ++i) {
+        AddState();
+    }
+}
+
+Fsm::States::iterator
+Fsm::AddState() {
+    states_.emplace_back(next_id_++);
+    return --states_.end();
+}
+
+const void Fsm::AddTransition(Fsm::States::iterator from,
+                              Fsm::States::iterator to,
+                              char letter)
+{
+    (*from).edges_out.emplace_back(to, EdgeLabel(letter));
+}
+
+const void Fsm::AddNonDeterministicTransition(Fsm::States::iterator from,
+                                              Fsm::States::iterator to)
+{
+    (*from).edges_out.emplace_back(to, EdgeLabel());
+}
+
+const void Fsm::AddTransitionForRemaining(Fsm::States::iterator from,
+                                          Fsm::States::iterator to)
+{
+    (*from).edges_out.emplace_back(to, EdgeLabel::Remainder());
+}
+
+const std::vector<char>&
+Fsm::GetAlphabet() const {
+    return alphabet_;
+}
+
+Fsm::StateContainer
+Fsm::GetStates() {
+    return Fsm::StateContainer(this);
+}
+
+Fsm::ConstStateContainer
+Fsm::GetStates() const {
+    return Fsm::ConstStateContainer(this);
+}
+
+Fsm::TransitionContainer
+Fsm::GetTransitions(Fsm::States::iterator state) {
+    return Fsm::TransitionContainer(state);
+}
+
+Fsm::ConstTransitionContainer
+Fsm::GetTransitions(Fsm::States::const_iterator state) const {
+    return Fsm::ConstTransitionContainer(state);
+}
+
+unsigned int Fsm::StateIdentifier(Fsm::States::const_iterator state) const {
+    return (*state).id;
+}
+
+Fsm ToBinarizedNfsm(Fsm& fsm, const std::vector<char>& alphabet) {
+   return Fsm(alphabet);
+}
+
 // TODO: Think about omitting the failure transitions.
 std::string
 Fsm::ToDotGraph() const {
     std::stringstream ss;
     ss << "digraph FSM {" << std::endl;
-    for (FsmState* state : GetStates()) {
+    const auto states = GetStates();
+    for (auto state = states.begin(); state != states.end(); ++state) {
         std::string state_id(std::to_string(StateIdentifier(state)));
         std::map<unsigned int, std::list<std::string>> edges;
         std::unordered_set<char> remaining_letters;
         std::copy(GetAlphabet().begin(), GetAlphabet().end(),
                 std::inserter(remaining_letters, remaining_letters.begin()));
-        for (auto transition : GetTransitions(state)) {
-            unsigned int out_id = StateIdentifier(transition.first);
-            EdgeLabel label = transition.second;
+        auto transitions = GetTransitions(state);
+        for (auto transition = transitions.begin(); transition != transitions.end(); ++transition) {
+            unsigned int out_id = StateIdentifier(transition->first);
+            EdgeLabel label = transition->second;
             std::string transition_str;
             if (label.remainder) {
                 // Only enumerate all others if it's reasonably small.
@@ -69,94 +143,6 @@ Fsm::ToDotGraph() const {
     return ss.str();
 }
 
-Fsm::State::State(unsigned int id) :
-    id(id), edges_out() {}
-
-Fsm::Fsm(const std::vector<char>& alphabet) :
-    alphabet_(alphabet),
-    states_(),
-    start_state_(nullptr),
-    success_state_(nullptr),
-    failure_state_(nullptr),
-    next_id_(0)
-{
-    start_state_ = AddState();
-    success_state_ = AddState();
-    failure_state_ = AddState();
-}
-
-Fsm::Fsm(const Fsm& other) :
-    states_(other.states_),
-    state_pointers_(),
-    start_state_(nullptr),
-    success_state_(nullptr),
-    failure_state_(nullptr),
-    next_id_(other.next_id_)
-{
-    auto it = states_.begin();
-    start_state_ = reinterpret_cast<FsmState*>(&(*it));
-    ++it;
-    success_state_ = reinterpret_cast<FsmState*>(&(*it));
-    ++it;
-    failure_state_ = reinterpret_cast<FsmState*>(&(*it));
-    for (auto& state : states_) {
-        state_pointers_.push_back(reinterpret_cast<FsmState*>(&state));
-    }
-}
-
-FsmState*
-Fsm::AddState() {
-    states_.emplace_back(next_id_++);
-    FsmState* state = reinterpret_cast<FsmState*>(&states_.back());
-    state_pointers_.push_back(state);
-    return state;
-}
-
-const void Fsm::AddTransition(FsmState* from,
-                                  FsmState* to,
-                                  char letter)
-{
-    Fsm::State* from_state = reinterpret_cast<Fsm::State*>(from);
-    from_state->edges_out.emplace_back(to, EdgeLabel(letter));
-}
-
-const void Fsm::AddNonDeterministicTransition(FsmState* from,
-                                              FsmState* to)
-{
-    Fsm::State* from_state = reinterpret_cast<Fsm::State*>(from);
-    from_state->edges_out.emplace_back(to, EdgeLabel());
-}
-
-const void Fsm::AddTransitionForRemaining(FsmState* from,
-                                          FsmState* to)
-{
-    Fsm::State* from_state = reinterpret_cast<Fsm::State*>(from);
-    from_state->edges_out.emplace_back(to, EdgeLabel::Remainder());
-}
-
-const std::vector<char>&
-Fsm::GetAlphabet() const {
-    return alphabet_;
-}
-
-std::list<FsmState*>
-Fsm::GetStates() const {
-    return state_pointers_;
-}
-
-// TODO: Expensive copy happening here. Iterators, son.
-std::list<std::pair<FsmState*, EdgeLabel>>
-Fsm::GetTransitions(FsmState* state) const {
-    return reinterpret_cast<Fsm::State*>(state)->edges_out;
-}
-
-unsigned int Fsm::StateIdentifier(FsmState* state) const {
-    return reinterpret_cast<Fsm::State*>(state)->id;
-}
-
-Fsm ToBinarizedNfsm(Fsm& fsm, const std::vector<char>& alphabet) {
-   return Fsm(alphabet);
-}
 
 } // end namespace fsm
 } // end namespace gnossen

@@ -7,8 +7,6 @@
 namespace gnossen {
 namespace fsm {
 
-typedef struct FsmState FsmState;
-
 struct EdgeLabel {
     // If set, this is a nondeterministic transition, consuming no input
     // characters. Mutually exlusive with the other two fields of this struct.
@@ -37,33 +35,53 @@ private:
 
 };
 
+
+
 class Fsm {
 public:
+    struct State;
+    using States = std::list<State>;
+
+    using Transition = std::pair<States::iterator, EdgeLabel>;
+    using Transitions = std::list<std::pair<States::iterator, EdgeLabel>>;
+
+    struct State {
+        unsigned int id;
+        Transitions edges_out;
+
+        State(unsigned int id);
+    };
+
     explicit Fsm(const std::vector<char>& alphabet);
     ~Fsm() {}
 
-    Fsm(const Fsm&);
+    Fsm(const Fsm&) = default;
+    Fsm(Fsm&&) = default;
+
+    Fsm& operator=(const Fsm&) = default;
+    Fsm& operator=(Fsm&&) = default;
 
     // Mutating methods.
 
-    FsmState* AddState() ;
+    // TODO: Add const_iterator version?
+    States::iterator AddState() ;
 
     // Adds a deterministic transition from one state to another.
-    const void AddTransition(FsmState* from,
-                                      FsmState* to,
-                                      char letter);
+    const void AddTransition(States::iterator from,
+                             States::iterator to,
+                             char letter);
 
 
     // Adds a nondeterministic transition from one state to another.
     // Following this transition does not consume a character.
-    const void AddNonDeterministicTransition(FsmState* from,
-                                             FsmState* to);
+    const void AddNonDeterministicTransition(States::iterator from,
+                                             States::iterator to);
 
     // Adds a determinisic transition for all letters not already
     // represented by a transition to the given state. No more transitions
     // may be added after this method has been called.
-    const void AddTransitionForRemaining(FsmState* from,
-                                         FsmState* to);
+    const void AddTransitionForRemaining(States::iterator from,
+                                         States::iterator to);
 
 
     // TODO: Supply an interface to add multiple letters to the
@@ -73,39 +91,72 @@ public:
 
     const std::vector<char>& GetAlphabet() const;
 
-    std::list<FsmState*> GetStates() const;
-    std::list<std::pair<FsmState*, EdgeLabel>>
-        GetTransitions(FsmState*) const;
+    friend class StateContainer;
 
-    unsigned int StateIdentifier(FsmState*) const;
+    struct StateContainer {
+        States::iterator begin() { return fsm_->states_.begin(); }
+        States::iterator end() { return fsm_->states_.end(); }
+
+        StateContainer(Fsm* fsm) : fsm_(fsm) {}
+
+    private:
+        Fsm* fsm_;
+    };
+
+    struct ConstStateContainer {
+        States::const_iterator begin() const { return fsm_->states_.begin(); }
+        States::const_iterator end() const { return fsm_->states_.end(); }
+
+        ConstStateContainer(const Fsm* fsm) : fsm_(fsm) {}
+
+    private:
+        const Fsm* fsm_;
+    };
+
+    StateContainer GetStates();
+    ConstStateContainer GetStates() const;
+
+    struct TransitionContainer {
+        Transitions::iterator begin() { return (*state_).edges_out.begin(); }
+        Transitions::iterator end() { return (*state_).edges_out.end(); }
+
+        TransitionContainer(States::iterator state) : state_(state) {}
+    private:
+        States::iterator state_;
+    };
+
+    struct ConstTransitionContainer {
+        Transitions::const_iterator begin() const { return (*state_).edges_out.begin(); }
+        Transitions::const_iterator end() const { return (*state_).edges_out.end(); }
+
+        ConstTransitionContainer(States::const_iterator state) : state_(state) {}
+    private:
+        const States::const_iterator state_;
+    };
+
+    TransitionContainer GetTransitions(States::iterator state);
+    ConstTransitionContainer GetTransitions(States::const_iterator state) const;
+
+    unsigned int StateIdentifier(States::const_iterator state) const;
 
     // These three states are automatically created without intervention
     // from the caller.
-    FsmState* GetStartState() const { return start_state_; }
-    FsmState* GetSuccessState() const { return success_state_; }
-    FsmState* GetFailureState() const { return failure_state_; }
+    States::iterator GetStartState() { return states_.begin(); }
+    States::const_iterator GetStartState() const { return GetStartState(); }
+
+    States::iterator GetSuccessState() { return ++states_.begin(); }
+    States::const_iterator GetSuccessState() const { return GetSuccessState(); }
+
+    States::iterator GetFailureState() { return ++GetSuccessState(); }
+    States::const_iterator GetFailureState() const { return GetFailureState(); }
 
     // Generates a dot graph corresponding to this FSM.
     std::string ToDotGraph() const;
 
 private:
-    struct State {
-        unsigned int id;
-        std::list<std::pair<FsmState*, EdgeLabel>> edges_out;
-
-        State(unsigned int id);
-    };
-
     const std::vector<char> alphabet_;
 
-    std::list<State> states_;
-
-    // TODO: Eliminate this when we add an iterator interface.
-    std::list<FsmState*> state_pointers_;
-
-    FsmState* start_state_;
-    FsmState* success_state_;
-    FsmState* failure_state_;
+    States states_;
     unsigned int next_id_;
 };
 

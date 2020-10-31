@@ -1,6 +1,8 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock-matchers.h"
 
+#include <iostream>
+
 #include <algorithm>
 #include <list>
 #include <vector>
@@ -18,59 +20,62 @@ TEST(FsmTest, CanBuild) {
   std::vector<char> alphabet {'a', 'b', 'c'};
   std::vector<char> extended_alphabet = {'a', 'b', 'c', '\0'};
   Fsm fsm(extended_alphabet);
-  auto* initial_state = fsm.GetStartState();
-  auto* state2 = fsm.AddState();
+  auto initial_state = fsm.GetStartState();
+  auto state2 = fsm.AddState();
   fsm.AddTransition(initial_state, state2, 'c');
   fsm.AddTransition(state2, state2, 'a');
   fsm.AddTransition(state2, state2, 'b');
-  auto* state3 = fsm.AddState();
+  auto state3 = fsm.AddState();
   fsm.AddTransition(state2, state3, 'c');
-  auto* state4 = fsm.AddState();
+  auto state4 = fsm.AddState();
   for (char letter : alphabet) {
     fsm.AddTransition(state3, state4, letter);
   }
   fsm.AddTransition(state4, fsm.GetSuccessState(), '\0');
 
-  std::set<FsmState*> observed_states;
-  const auto states = fsm.GetStates();
-  std::copy(states.begin(), states.end(),
-          std::inserter(observed_states, observed_states.begin()));
-  std::set<FsmState*> expected_states = {
-    initial_state,
-    state2,
-    state3,
-    state4,
-    fsm.GetSuccessState(),
-    fsm.GetFailureState(),
+  std::set<unsigned int> observed_states;
+  auto states = fsm.GetStates();
+  for (auto state = states.begin(); state != states.end(); ++state) {
+    observed_states.insert(fsm.StateIdentifier(state));
+  }
+  std::set<unsigned int> expected_states = {
+    fsm.StateIdentifier(initial_state),
+    fsm.StateIdentifier(state2),
+    fsm.StateIdentifier(state3),
+    fsm.StateIdentifier(state4),
+    fsm.StateIdentifier(fsm.GetSuccessState()),
+    fsm.StateIdentifier(fsm.GetFailureState())
   };
 
   EXPECT_THAT(observed_states, ::testing::ContainerEq(expected_states));
 
-  using Edge = std::pair<FsmState*, char>;
+  using Edge = std::pair<unsigned int, char>;
   using Edges = std::list<Edge>;
-  std::map<FsmState*, Edges> observed_transitions;
-  std::map<FsmState*, Edges> expected_transitions = {
-    {initial_state, Edges{Edge{state2, 'c'}}},
-    {state2, Edges{
-                Edge{state2, 'a'},
-                Edge{state2, 'b'},
-                Edge{state3, 'c'}
+  std::map<unsigned int, Edges> observed_transitions;
+  std::map<unsigned int, Edges> expected_transitions = {
+    {fsm.StateIdentifier(initial_state), Edges{Edge{fsm.StateIdentifier(state2), 'c'}}},
+    {fsm.StateIdentifier(state2), Edges{
+                Edge{fsm.StateIdentifier(state2), 'a'},
+                Edge{fsm.StateIdentifier(state2), 'b'},
+                Edge{fsm.StateIdentifier(state3), 'c'}
              }
     },
-    {state3, Edges{
-                Edge{state4, 'a'},
-                Edge{state4, 'b'},
-                Edge{state4, 'c'}
+    {fsm.StateIdentifier(state3), Edges{
+                Edge{fsm.StateIdentifier(state4), 'a'},
+                Edge{fsm.StateIdentifier(state4), 'b'},
+                Edge{fsm.StateIdentifier(state4), 'c'}
              }
     },
-    {state4, Edges{Edge{fsm.GetSuccessState(), '\0'}}},
+    {fsm.StateIdentifier(state4), Edges{Edge{fsm.StateIdentifier(fsm.GetSuccessState()), '\0'}}},
   };
 
-  for (FsmState* state : fsm.GetStates()) {
+  for (auto state = states.begin(); state != states.end(); ++state) {
     for (auto transition : fsm.GetTransitions(state)) {
       EXPECT_FALSE(transition.second.empty_edge);
-      observed_transitions[state].emplace_back(transition.first,
-                                               transition.second.edge_label);
+      EXPECT_FALSE(transition.second.remainder);
+      observed_transitions[fsm.StateIdentifier(state)].emplace_back(
+              fsm.StateIdentifier(transition.first),
+              transition.second.edge_label);
     }
   }
 
