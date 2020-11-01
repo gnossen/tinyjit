@@ -69,6 +69,11 @@ public:
     // Adds a deterministic transition from one state to another.
     const void AddTransition(States::iterator from,
                              States::iterator to,
+                             EdgeLabel label);
+
+    // Adds a deterministic transition from one state to another.
+    const void AddTransition(States::iterator from,
+                             States::iterator to,
                              char letter);
 
 
@@ -160,7 +165,7 @@ private:
     unsigned int next_id_;
 };
 
-Fsm ToBinarizedNfsm(Fsm& fsm, const std::vector<char>& alphabet);
+Fsm ToBinarizedNfsm(Fsm& fsm);
 
 } // end namespace fsm
 } // end namespace gnosse

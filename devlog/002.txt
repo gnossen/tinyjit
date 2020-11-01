@@ -138,3 +138,143 @@ states. It'll be interesting to figure out how I get that to work.
 So now that I have a decent idea of what the input and output are going to have
 to look like, I'm starting in on implementing the first chunk. I know I need a
 representation for finite state machines.
+
+10/30/2020
+
+Okay, so I went ahead and started writing some FSM code. I'm sort of starting in
+the middle. The stages in the pipeline look like this:
+
+1. Regex string
+2. Regex AST
+3. Non-minimal Nondeterministic Finite Automaton
+4. Minimal Deterministic Finite Automaton
+5. Binarized Nondeterministic Finite Automaton
+6. Machine Code Abstraction
+7. Machine Code
+
+I've written an FSM class that I think can be the data type for steps 3 through
+6. Of course, now, I have to write functions to convert between each of them.
+
+Let me explain each of this in a little more depth.
+
+### 1. Regex String
+
+This is exactly what you'd expect. This would be something like "c(a|b)*c.".
+
+### 2. Regex AST
+
+This is a parsed form of the regex string. This could potentially be elided
+entirely. Using S-expressions, this would look something like:
+
+```
+(cat
+  (letter c)
+  (cat
+    (rep
+      (or
+        (letter a)
+        (letter b)))
+    (cat
+      (letter c)
+      (or
+        (letter a)
+        (letter b)
+        (letter c)))))
+```
+
+### 3. Non-minimal Nondeterministic Finite Automaton
+
+Okay, these are getting progressively harder to do in ASCII, so I'll just
+describe the constraints. In this case, I'll have mapping from elements in the
+AST to graph structures that might involve nondeterministic transitions. I have
+a pattern for each AST element and when you compose them all together, you get
+some interesting looking NFSMs with a *lot* of epsilons.
+
+The important bit is that the section of NFSM corresponding to each element has
+exactly one source state (coming from the parent in the AST) and one sync, which
+can be linked to another state. For example, in the case of a `cat` node, the
+sink of the LHS becomes the source of the RHS.
+
+### 4. Minimal Deterministic Finite Automaton
+
+This is one of those magical algorithms that creates stuff you never would have
+thought of yourself. At each state, we iterate over each of the letters. We
+figure out which states taking each of the letters could have taken us to. This
+leads us to a superposition of states in the original graph. Each superposition
+will correspond to a new state in the next graph. Repeat until minimized and no
+epsilons left.
+
+### 5. Binarized Nondeterministic Finite Automaton
+
+This is a form I came up with yesterday while writing my assembly. I have a
+bunch of little chunks of assembly that do one check each and either advanced
+`%rdi` or not. If a section does not advance `%rdi`, it's basically equivalent
+to an epsilon transition. The goal here is to transform the FSM such that any
+state has a corresponding pattern that we know how to translate into assembly.
+
+Here's a list of the patterns that we know:
+
+1. Check for a single character and advance `%rdi`. If no match, go to some
+    section `X`. If there's a match, go to the next section.
+
+
+```
+    mov     $0x63, %al  ; 'c'
+    scasb
+    jnz     .some_other_section
+```
+
+This corresponds to a state like this:
+
+```dot
+digraph foo {
+  1 -> 2 [ label = "c" ]
+  1 -> X [ label = "else" ]
+}
+```
+
+
+2. Check for a single character. If there's a match, go to
+    some specified section with `%rdi` incremented. If no match, go to the
+    next section without incrementing it.
+
+```
+    mov     $0x63, %al  ; 'c'
+    scasb
+    jz      .some_other_section
+    dec     %edi
+```
+
+This corresponds to a nondeterministic transition:
+
+
+```dot
+digraph foo {
+  1 -> 2 [ label = "c" ]
+  1 -> X [ label = "epsilon" ]
+}
+```
+
+And there are others that can be added as optimizations corresponding to
+efficient sets of x86 instructions. For example, I could use `scasq` for a
+series of four constant characters.
+
+What's important, though, is that the collection of primitives that I aggregate
+be *universal*. That is, that, collectively, it is possible to transform an
+aribtrary determinstic FSM into one of these.
+
+10/31/2020
+
+Alright, I'm back! I've been thinking. I kind of want do do some fuzzer-based
+testing on this. I'm going to do a non-JIT matcher that I can compare the JITted
+results against. Then, I can write a libfuzzer mutator to do some
+structure-aware fuzzing. Should be a cool little exercise. Anyway, back to FSM
+transformations.
+
+So for each state in the original FSM, we're going to iterate over the list of
+transitions. If there are no transitions (i.e. final state), we just copy the
+state and we're done. If there's only one transition, (i.e. match a single
+character) we're also done. If there are *more* than one, then we create a new
+state as a child of the original with an epsilon transition. We continue this
+until we have a chain of states connected by epsilon transitions such that the
+final state has a single deterministic transition.

@@ -4,6 +4,8 @@
 #include <iostream>
 
 #include <algorithm>
+#include <fstream>
+#include <cstdlib>
 #include <list>
 #include <vector>
 #include <set>
@@ -15,6 +17,13 @@ namespace gnossen {
 namespace fsm {
 
 namespace {
+
+static void WriteDotFile(const Fsm& fsm, std::string filename) {
+  std::string extra_artifacts_dir(getenv("TEST_UNDECLARED_OUTPUTS_DIR"));
+  std::string filepath = extra_artifacts_dir + "/" + filename;
+  std::ofstream outfile(filepath, std::ofstream::out);
+  outfile << fsm.ToDotGraph() << std::endl;
+}
 
 TEST(FsmTest, CanBuild) {
   std::vector<char> alphabet {'a', 'b', 'c'};
@@ -81,8 +90,7 @@ TEST(FsmTest, CanBuild) {
 
   EXPECT_THAT(observed_transitions, ::testing::ContainerEq(expected_transitions));
 
-  // TODO: Put in EXTRA_ARTIFACTS.
-  std::cerr << fsm.ToDotGraph() << std::endl;
+  WriteDotFile(fsm, "fsm1.dot");
 }
 
 TEST(FsmTest, ToBinarizedFsm) {
@@ -102,7 +110,11 @@ TEST(FsmTest, ToBinarizedFsm) {
   }
   fsm.AddTransition(state4, fsm.GetSuccessState(), '\0');
 
-  Fsm binarized_fsm = ToBinarizedNfsm(fsm, alphabet);
+  Fsm binarized_fsm = ToBinarizedNfsm(fsm);
+
+  WriteDotFile(fsm, "pre_binarized_fsm1.dot");
+  WriteDotFile(binarized_fsm, "binarized_fsm1.dot");
+
   std::unordered_set<unsigned int> visited;
   std::list<Fsm::States::iterator> to_visit;
   to_visit.push_back(binarized_fsm.GetStartState());
@@ -118,22 +130,19 @@ TEST(FsmTest, ToBinarizedFsm) {
 
     visited.insert(binarized_fsm.StateIdentifier(state));
 
+    auto transitions = binarized_fsm.GetTransitions(state);
+    size_t transition_count = std::distance(transitions.begin(), transitions.end());
+    size_t deterministic_transitions = 0;
     std::vector<Fsm::States::iterator> next_states;
-    bool found_empty_edge = false;
-    size_t transition_count = 0;
-    for (auto edge : binarized_fsm.GetTransitions(state)) {
+    for (auto edge : transitions) {
+      if (!edge.second.empty_edge && !edge.second.remainder)
+        ++deterministic_transitions;
       next_states.push_back(edge.first);
-      if (edge.second.empty_edge) {
-        found_empty_edge = true;
-      }
-      ++transition_count;
     }
-    EXPECT_EQ(next_states.size(), 2) << "Binarized state must have exactly two successors";
-    if (std::find(next_states.begin(), next_states.end(), binarized_fsm.GetFailureState()) == next_states.end() &&
-        !(transition_count == 1 && found_empty_edge)) {
-      EXPECT_TRUE(false) << "State neither had exactly two successors with one being epsilon nor" <<
-        " linked to failure state.";
-    }
+
+    ASSERT_LE(transition_count, 2);
+    ASSERT_LE(deterministic_transitions, 1);
+
     for (auto state : next_states) {
       to_visit.push_back(state);
     }
