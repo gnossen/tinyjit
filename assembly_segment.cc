@@ -22,7 +22,7 @@ size_t AssemblySubroutine::maximum_distance(unsigned int a, unsigned int b) cons
   } else {
     size_t offset = 0;
     for (unsigned int i = a; i < b; ++i) {
-      offset += segments_[i]->max_size();
+      offset += segments_[index_mapping_.at(i)]->max_size();
     }
     return offset;
   }
@@ -31,16 +31,14 @@ size_t AssemblySubroutine::maximum_distance(unsigned int a, unsigned int b) cons
 size_t AssemblySubroutine::absolute_offset(unsigned int segment_index) const {
   size_t offset = 0;
   for (unsigned int i = 0; i < segment_index; ++i) {
-    offset += segments_[i]->size();
+    offset += segments_[index_mapping_.at(i)]->size();
   }
   return offset;
 }
 
 
 void AssemblySubroutine::add_segment(std::unique_ptr<AssemblySegment> segment) {
-  // TODO: Remove this restriction and allow the caller to add segments
-  // in any order they choose.
-  assert(segment->id() == segments_.size());
+  index_mapping_[segment->id()] = segments_.size();
   segments_.push_back(std::move(segment));
 }
 

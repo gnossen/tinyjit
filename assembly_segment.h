@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 namespace gnossen {
 namespace assembly {
@@ -76,6 +77,10 @@ public:
 
 private:
   std::vector<std::unique_ptr<AssemblySegment>> segments_;
+
+  // Mapping from segment indices as supplied by the caller to offsets into the
+  // segments_ container.
+  std::unordered_map<unsigned int, unsigned int> index_mapping_;
 };
 
 // You could argue that this is a hack and I should eliminate it in a
