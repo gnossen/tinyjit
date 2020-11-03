@@ -176,14 +176,43 @@ std::string ConsumingMatchNonConsumingNonMatch::debug_string() const {
   std::stringstream ss;
   ss <<
   ".section_" << index_ << ":" << std::endl <<
-  "    mov 0x" << std::hex << (uint8_t)letter_ <<
-      std::dec << "  ; " << letter_ <<  std::endl <<
+  "    mov $0x" << std::hex << (unsigned int)letter_ <<
+      std::dec << ", %al  ; '" << letter_ << "'" <<  std::endl <<
   "    scasb" << std::endl <<
   "    je .section_" << jmp_index_ <<  "  ; Offset " <<
       std::hex << relative_offset_  << std::dec << std::endl <<
   "    dec %rdi" << std::endl;
   return ss.str();
 }
+
+void StaticCodeSegment::write_code(uint8_t** code) const noexcept{
+  memcpy(*code, code_, code_size_);
+}
+
+size_t StaticCodeSegment::size() const noexcept{
+  return code_size_;
+}
+
+size_t StaticCodeSegment::max_size() const noexcept{
+  return code_size_;
+}
+
+const uint8_t StackManagementSegment::kCode[] = {
+  0x55,             // push %rbp
+  0x48, 0x89, 0xe5  // mov %rsp, %rbp
+};
+
+StackManagementSegment::StackManagementSegment(unsigned int id) :
+  StaticCodeSegment(id, kCode, sizeof(kCode)) {}
+
+std::string StackManagementSegment::debug_string() const {
+  std::stringstream ss;
+  ss <<
+  "    push %rbp" << std::endl <<
+  "    mov %rsp, %rbp" << std::endl;
+  return ss.str();
+}
+
 
 // TODO: Implement stack management section.
 // TODO: Implement success section.

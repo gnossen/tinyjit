@@ -142,11 +142,16 @@ public:
 
   size_t max_size() const noexcept override;
 
+  unsigned int id() const override {
+    return index_;
+  }
+
 private:
   static const uint8_t kCodeRel8[];
 
   static const uint8_t kCodeRel16Or32[];
 
+  // TODO: Rename to id_.
   unsigned int index_;
   char letter_;
   unsigned int jmp_index_;
@@ -187,6 +192,43 @@ private:
   //   0x75, 0x00,   // jne .section_X
   //   // 0x0f, 0x85, 0x00, 0x00   // jne rel16
   // };
+};
+
+class StaticCodeSegment : public AssemblySegment {
+public:
+
+  StaticCodeSegment(unsigned int id, const uint8_t* code, size_t code_size) noexcept :
+    id_(id), code_(code), code_size_(code_size) {}
+
+  void write_code(uint8_t** code) const noexcept override;
+
+  void determine_size(const OffsetInterface* offset_if) noexcept override {}
+
+  void determine_offset(const OffsetInterface* offset_if) noexcept override {}
+
+  virtual std::string debug_string() const = 0;
+  size_t size() const noexcept override;
+
+  size_t max_size() const noexcept override;
+
+  unsigned int id() const override {
+    return id_;
+  }
+
+private:
+  unsigned int id_;
+
+  const uint8_t* code_;
+  const size_t code_size_;
+};
+
+class StackManagementSegment : public StaticCodeSegment {
+private:
+  static const uint8_t kCode[];
+
+public:
+  StackManagementSegment(unsigned int id);
+  std::string debug_string() const override;
 };
 
 } // end namespace assembly

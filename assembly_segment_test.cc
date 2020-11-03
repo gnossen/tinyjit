@@ -5,14 +5,22 @@
 
 #include <memory>
 
+#include <iostream>
+
 namespace gnossen {
 namespace assembly {
 namespace {
 
 TEST(AssemblySegmentTest, CanBuild) {
   AssemblySubroutine subroutine;
-  subroutine.add_segment(std::move(std::make_unique<NoOp>(0)));
+  unsigned int id = 0;
+  subroutine.add_segment(std::move(std::make_unique<StackManagementSegment>(id++)));
+  subroutine.add_segment(std::move(std::make_unique<NoOp>(id++)));
+  subroutine.add_segment(std::move(
+        std::make_unique<ConsumingMatchNonConsumingNonMatch>(id++, 'a', 1)));
   subroutine.finalize();
+
+  std::cerr << subroutine.debug_string();
 }
 
 }
