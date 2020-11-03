@@ -38,6 +38,8 @@ size_t AssemblySubroutine::absolute_offset(unsigned int segment_index) const {
 
 
 void AssemblySubroutine::add_segment(std::unique_ptr<AssemblySegment> segment) {
+  // TODO: Remove this restriction and allow the caller to add segments
+  // in any order they choose.
   assert(segment->id() == segments_.size());
   segments_.push_back(std::move(segment));
 }
@@ -213,10 +215,44 @@ std::string StackManagementSegment::debug_string() const {
   return ss.str();
 }
 
+// TODO: Maybe xor %rax,%rax followed by inc would be faster?
+const uint8_t SuccessSegment::kCode[] = {
+  0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,   // mov $01, %rax
+  0x5d,                                       // pop %rbp
+  0xc3                                        // retq
+};
 
-// TODO: Implement stack management section.
-// TODO: Implement success section.
-// TODO: Implement failure section.
+SuccessSegment::SuccessSegment(unsigned int id) :
+  StaticCodeSegment(id, kCode, sizeof(kCode)) {}
+
+std::string SuccessSegment::debug_string() const {
+  std::stringstream ss;
+  ss <<
+  ".section_" << id() << ":  ; success" << std::endl <<
+  "    mov $01, %rax" << std::endl <<
+  "    pop %rbp" << std::endl <<
+  "    retq" << std::endl;
+  return ss.str();
+}
+
+const uint8_t FailureSegment::kCode[] = {
+  0x31, 0xc0,   // xor %eax, %eax
+  0x5d,         // pop %rbp
+  0xc3          // retq
+};
+
+FailureSegment::FailureSegment(unsigned int id) :
+  StaticCodeSegment(id, kCode, sizeof(kCode)) {}
+
+std::string FailureSegment::debug_string() const {
+  std::stringstream ss;
+  ss <<
+  ".section_" << id() << ":  ; failure" << std::endl <<
+  "    xor %eax, %eax" << std::endl <<
+  "    pop %rbp" << std::endl <<
+  "    retq" << std::endl;
+  return ss.str();
+}
 
 } // end namespace assembly
 } // end namespace gnossen

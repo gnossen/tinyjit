@@ -18,6 +18,8 @@ TEST(AssemblySegmentTest, CanBuild) {
   subroutine.add_segment(std::move(std::make_unique<NoOp>(id++)));
   subroutine.add_segment(std::move(
         std::make_unique<ConsumingMatchNonConsumingNonMatch>(id++, 'a', 1)));
+  subroutine.add_segment(std::move(std::make_unique<SuccessSegment>(id++)));
+  subroutine.add_segment(std::move(std::make_unique<FailureSegment>(id++)));
   subroutine.finalize();
 
   std::cerr << subroutine.debug_string();

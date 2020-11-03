@@ -231,5 +231,23 @@ public:
   std::string debug_string() const override;
 };
 
+class SuccessSegment : public StaticCodeSegment {
+private:
+  static const uint8_t kCode[];
+
+public:
+  SuccessSegment(unsigned int id);
+  std::string debug_string() const override;
+};
+
+class FailureSegment : public StaticCodeSegment {
+private:
+  static const uint8_t kCode[];
+
+public:
+  FailureSegment(unsigned int id);
+  std::string debug_string() const override;
+};
+
 } // end namespace assembly
 } // end namespace gnossen
