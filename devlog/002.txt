@@ -278,3 +278,20 @@ character) we're also done. If there are *more* than one, then we create a new
 state as a child of the original with an epsilon transition. We continue this
 until we have a chain of states connected by epsilon transitions such that the
 final state has a single deterministic transition.
+
+Alright. I'm done with my first pass at FSM stuff. The next step is going to be
+translating this stuff to assembly. I want to make sure I have good
+observability into this stuff, so there are going to be plenty of debugging
+utilities.
+
+So, one thing that I hadn't considered is that I'm going to need to decide
+whether to do my jumps as rel16's or rel8's. The decision of which one to go
+with is dependent on how far away the section I need is and how far away the
+section I need is is dependent on which one I pick. Whoops. Well, I can either
+get into some very complex logic, or I can decide to just use a rel16 every
+time. I think that second options works best for me. We might go back to that
+decision in the future. Now, the difference between a rel8 jump and a rel16 jump
+is two bytes. If *every* section between this one and the one we need reached
+its max size and we're still in distance, then we can safely make this one
+smaller. I like that idea. Instructions now present a max_size before they're
+set and then a size after.

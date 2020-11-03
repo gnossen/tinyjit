@@ -1,3 +1,5 @@
+// TODO: Header guards.
+
 #include <string>
 #include <list>
 #include <utility>
