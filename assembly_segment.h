@@ -1,5 +1,7 @@
 #include <cstdint>
 #include <string>
+#include <memory>
+#include <vector>
 
 namespace gnossen {
 namespace assembly {
@@ -28,10 +30,12 @@ public:
 class AssemblySegment {
 public:
 
-  virtual void write_code(uint8_t** code, const OffsetInterface* offset_if) = 0;
+  virtual void write_code(uint8_t** code) const = 0;
   virtual std::string debug_string() const = 0;
 
   virtual void determine_size(const OffsetInterface* offset_if) = 0;
+
+  virtual void determine_offset(const OffsetInterface* offset_if) = 0;
 
   // Only valid to call this after write_code has been called.
   virtual size_t size() const = 0;
@@ -39,19 +43,56 @@ public:
   // The maximum size that this segment will take on. It is valid to call this
   // method before write_code.
   virtual size_t max_size() const = 0;
+
+  virtual unsigned int id() const = 0;
+};
+
+class AssemblySubroutine : public OffsetInterface {
+public:
+
+  AssemblySubroutine() = default;
+  AssemblySubroutine(const AssemblySubroutine&) = default;
+  AssemblySubroutine(AssemblySubroutine&&) = default;
+  AssemblySubroutine& operator=(const AssemblySubroutine&) = default;
+  AssemblySubroutine& operator=(AssemblySubroutine&&) = default;
+
+  size_t maximum_distance(unsigned int a, unsigned int b) const override;
+
+  size_t absolute_offset(unsigned int segment_index) const override;
+
+  void add_segment(std::unique_ptr<AssemblySegment> segment);
+
+  // After this method has been called, no further segments may be added.
+  void finalize();
+
+  // The buffer passed in must be at least as big as size().
+  void write_code(uint8_t* buffer) const;
+
+  // Must not be called until after finalize().
+  size_t size() const;
+
+  // GOAL: Should be able to be assembled without any modifications.
+  std::string debug_string() const;
+
+private:
+  std::vector<std::unique_ptr<AssemblySegment>> segments_;
 };
 
 // You could argue that this is a hack and I should eliminate it in a
 // prior step.
 class NoOp : public AssemblySegment {
-  NoOp() = default;
-
 public:
-  void write_code(uint8_t** code, const OffsetInterface* offset_if) override {
+  NoOp(unsigned int id) : id_(id) {}
+
+  void write_code(uint8_t** code) const override {
     // Do nothing. 
   }
 
   void determine_size(const OffsetInterface* offset_if) override {
+    // Do nothing.
+  }
+
+  void determine_offset(const OffsetInterface* offset_if) override {
     // Do nothing.
   }
 
@@ -65,7 +106,13 @@ public:
     return 0;
   }
 
+  unsigned int id() const override {
+    return id_;
+  }
+
 private:
+
+  const unsigned int id_;
 
   static const uint8_t kCode[];
 };
@@ -84,9 +131,11 @@ public:
     offset_size_(0),
     relative_offset_(0) {}
 
-  void write_code(uint8_t** code, const OffsetInterface* offset_if) noexcept override;
+  void write_code(uint8_t** code) const noexcept override;
 
   void determine_size(const OffsetInterface* offset_if) noexcept override;
+
+  void determine_offset(const OffsetInterface* offset_if) noexcept override;
 
   std::string debug_string() const override;
   size_t size() const noexcept override;
@@ -109,15 +158,26 @@ private:
 // section, otherwise jump to the given section.
 class ConsumingMatchElse : public AssemblySegment {
 public:
-  void write_code(uint8_t** code, const OffsetInterface* offset_if) override;
+
+
+  void write_code(uint8_t** code) const override;
 
   void determine_size(const OffsetInterface* offset_if) override {
+    // TODO: Implement.
+  }
+
+  void determine_offset(const OffsetInterface* offset_if) noexcept override {
     // TODO: Implement.
   }
 
   std::string debug_string() const override;
   size_t size() const override;
   size_t max_size() const noexcept override;
+
+  unsigned int id() const override {
+    // TODO: Actually implement.
+    return 0;
+  }
 
 private:
 
