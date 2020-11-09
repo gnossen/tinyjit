@@ -102,7 +102,7 @@ public:
   }
 
   std::string debug_string() const override {
-    return "    ; No-op section\n";
+    return "    // No-op section\n";
   }
 
   size_t size() const override { return 0; }
@@ -164,39 +164,87 @@ private:
   int32_t relative_offset_;
 };
 
-// Consumes a single character. If there's a match, continue to the next
-// section, otherwise jump to the given section.
-class ConsumingMatchElse : public AssemblySegment {
+// This segment is not stored in an AssemblySubroutine and therefore
+// it does not have its own index. It is only used within the context of a
+// *parent* segment.
+class JumpEqualSegment : public AssemblySegment {
 public:
+  JumpEqualSegment(unsigned int parent_index,
+      unsigned int parent_offset,
+      unsigned int jmp_index) noexcept :
+    parent_index_(parent_index),
+    parent_offset_(parent_offset),
+    jmp_index_(jmp_index) {}
 
+  void determine_size(const OffsetInterface* offset_if) noexcept override;
 
-  void write_code(uint8_t** code) const override;
+  void determine_offset(const OffsetInterface* offset_if) noexcept override;
 
-  void determine_size(const OffsetInterface* offset_if) override {
-    // TODO: Implement.
-  }
-
-  void determine_offset(const OffsetInterface* offset_if) noexcept override {
-    // TODO: Implement.
-  }
+  void write_code(uint8_t** code) const noexcept override;
 
   std::string debug_string() const override;
-  size_t size() const override;
+
+  size_t size() const noexcept override;
+
   size_t max_size() const noexcept override;
 
   unsigned int id() const override {
-    // TODO: Actually implement.
+    // This should never be called.
     return 0;
   }
 
 private:
 
-  // static const uint8_t kCode[] = {
-  //   0xb0, 0x00,   // mov LETTER, %al
-  //   0xae,         // scas
-  //   0x75, 0x00,   // jne .section_X
-  //   // 0x0f, 0x85, 0x00, 0x00   // jne rel16
-  // };
+  static const uint8_t kCodeRel8[];
+  static const uint8_t kCodeRel16Or32[];
+
+  // The index of the parent segment.
+  unsigned int parent_index_;
+
+  // The offset of this instruction within the parent.
+  unsigned int parent_offset_;
+
+  // The index of the segment to which to jump.
+  unsigned int jmp_index_;
+
+  size_t offset_size_;
+  int32_t relative_offset_;
+};
+
+// Consumes a single character. If there's a match, continue to the next
+// section, otherwise jump to the given section.
+class ConsumingMatchElse : public AssemblySegment {
+public:
+
+  ConsumingMatchElse(unsigned int index,
+                     char letter, unsigned int jmp_index) noexcept :
+    index_(index),
+    letter_(letter),
+    jmp_index_(jmp_index),
+    jmp_segment_(index, 3, jmp_index) {}
+
+  void write_code(uint8_t** code) const override;
+
+  void determine_size(const OffsetInterface* offset_if) noexcept override;
+
+  void determine_offset(const OffsetInterface* offset_if) noexcept override;
+
+  std::string debug_string() const override;
+  size_t size() const override;
+  size_t max_size() const noexcept override;
+
+  unsigned int id() const override;
+
+private:
+
+  static const uint8_t kCodePreamble[];
+
+  unsigned int index_;
+  char letter_;
+
+  // TODO: Is this member still needed at this level?
+  unsigned int jmp_index_;
+  JumpEqualSegment jmp_segment_;
 };
 
 class StaticCodeSegment : public AssemblySegment {

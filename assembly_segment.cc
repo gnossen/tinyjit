@@ -113,6 +113,7 @@ void ConsumingMatchNonConsumingNonMatch::write_code(
   }
 }
 
+// TODO: Replace with JumpEqualSegment.
 void ConsumingMatchNonConsumingNonMatch::determine_size(
     const OffsetInterface* offset_if) noexcept
 {
@@ -140,10 +141,10 @@ void ConsumingMatchNonConsumingNonMatch::determine_offset(
   const size_t other_segment_start = offset_if->absolute_offset(jmp_index_);
   if (offset_size_ == 8) {
     const size_t jmp_relative = this_segment_start + 5;
-    relative_offset_ = jmp_relative - other_segment_start;
+    relative_offset_ = other_segment_start - jmp_relative;
   } else if (offset_size_ == 16 || offset_size_ == 32) {
     const size_t jmp_relative = this_segment_start + 9;
-    relative_offset_ = jmp_relative - other_segment_start;
+    relative_offset_ = other_segment_start - jmp_relative;
   } else {
     std::cerr << "determine_offset() called before determine_size()." << std::endl;
     exit(1);
@@ -177,16 +178,142 @@ std::string ConsumingMatchNonConsumingNonMatch::debug_string() const {
   ss <<
   ".section_" << index_ << ":" << std::endl <<
   "    mov $0x" << std::hex << (unsigned int)letter_ <<
-      std::dec << ", %al  ; '" << letter_ << "'" <<  std::endl <<
+      std::dec << ", %al  // '" << letter_ << "'" <<  std::endl <<
   "    scasb" << std::endl <<
-  "    je .section_" << jmp_index_ <<  "  ; Offset " <<
+  "    je .section_" << jmp_index_ <<  "  // Offset 0x" <<
       std::hex << relative_offset_  << std::dec << std::endl <<
   "    dec %rdi" << std::endl;
   return ss.str();
 }
 
+
+const uint8_t JumpEqualSegment::kCodeRel8[] = {
+  0x74, 0x00       // je .section_X
+};
+
+const uint8_t JumpEqualSegment::kCodeRel16Or32[] = {
+  0x0f, 0x84, 0x00, 0x00, 0x00, 0x00 // je .section_X ; rel16 or rel32
+};
+
+void JumpEqualSegment::determine_size(
+    const OffsetInterface* offset_if) noexcept
+{
+  const size_t max_inter_segment_distance = offset_if->maximum_distance(parent_index_, jmp_index_);
+
+  // Offset is relative to the end of the jump statement.
+  const size_t max_distance = max_inter_segment_distance + parent_offset_ + this->max_size();
+  if (max_distance < k8BitMax) {
+    offset_size_ = 8;
+  } else if (max_distance < k16BitMax) {
+    offset_size_ = 16;
+  } else if (max_distance < k32BitMax) {
+    offset_size_ = 32;
+  } else {
+    std::cerr << "Encountered offset " << max_distance << "not representable with 32 bits." << std::endl;
+    exit(1);
+  }
+}
+
+void JumpEqualSegment::determine_offset(
+    const OffsetInterface* offset_if) noexcept
+{
+  const size_t parent_segment_start = offset_if->absolute_offset(parent_index_);
+  const size_t other_segment_start = offset_if->absolute_offset(jmp_index_);
+  const size_t jmp_relative = parent_segment_start + parent_offset_ + this->size();
+  relative_offset_ = other_segment_start - jmp_relative;
+}
+
+void JumpEqualSegment::write_code(uint8_t** code) const noexcept {
+  if (offset_size_ == 8) {
+    const int8_t offset = relative_offset_;
+    memcpy(*code, kCodeRel8, sizeof(kCodeRel8));
+    ((int8_t*)*code)[1] = offset;
+    *code += sizeof(kCodeRel8);
+  } else if (offset_size_ == 16 || offset_size_ == 32) {
+    const int32_t offset = relative_offset_;
+    memcpy(*code, kCodeRel16Or32, sizeof(kCodeRel16Or32));
+    ((int8_t*)*code)[2] = offset;
+    *code += sizeof(kCodeRel16Or32);
+  } else {
+    std::cerr << "write_code() called before determine_size()." << std::endl;
+    exit(1);
+  }
+}
+
+std::string JumpEqualSegment::debug_string() const {
+  if  (offset_size_ == 0 || relative_offset_ == 0) {
+    std::cerr << "debug_string() called before determine_offset()." << std::endl;
+    exit(1);
+  }
+
+  std::stringstream ss;
+  ss <<
+  "    je .section_" << jmp_index_ <<  "  // Offset 0x" <<
+      std::hex << relative_offset_  << std::dec << std::endl;
+  return ss.str();
+}
+
+size_t JumpEqualSegment::size() const noexcept {
+  if (offset_size_ == 8) {
+    return sizeof(kCodeRel8);
+  } else if (offset_size_ == 16 || offset_size_ == 32) {
+    return sizeof(kCodeRel16Or32);
+  } else {
+    std::cerr << "size() called before determine_size()." << std::endl;
+    exit(1);
+  }
+}
+
+size_t JumpEqualSegment::max_size() const noexcept {
+  return sizeof(kCodeRel16Or32);
+}
+
+const uint8_t ConsumingMatchElse::kCodePreamble[] = {
+  0xb0, 0x00,   // mov LETTER, %al
+  0xae          // scasb
+};
+
+void ConsumingMatchElse::write_code(uint8_t** code) const {
+  memcpy(*code, kCodePreamble, sizeof(kCodePreamble));
+  ((char*)*code)[1] = letter_;
+  *code += sizeof(kCodePreamble);
+  jmp_segment_.write_code(code);
+}
+
+void ConsumingMatchElse::determine_size(const OffsetInterface* offset_if) noexcept {
+  jmp_segment_.determine_size(offset_if);
+}
+
+void ConsumingMatchElse::determine_offset(const OffsetInterface* offset_if) noexcept {
+  jmp_segment_.determine_offset(offset_if);
+}
+
+std::string ConsumingMatchElse::debug_string() const {
+  std::stringstream ss;
+  ss <<
+  ".section_" << index_ << ":" << std::endl <<
+  "    mov $0x" << std::hex << (unsigned int)letter_ <<
+      std::dec << ", %al  // '" << letter_ << "'" <<  std::endl <<
+  "    scasb" << std::endl <<
+  jmp_segment_.debug_string();
+  return ss.str();
+}
+
+size_t ConsumingMatchElse::size() const {
+  return sizeof(kCodePreamble) + jmp_segment_.size();
+}
+
+size_t ConsumingMatchElse::max_size() const noexcept {
+  return sizeof(kCodePreamble) + jmp_segment_.max_size();
+}
+
+unsigned int ConsumingMatchElse::id() const {
+  return index_;
+}
+
 void StaticCodeSegment::write_code(uint8_t** code) const noexcept{
   memcpy(*code, code_, code_size_);
+  *code += code_size_;
 }
 
 size_t StaticCodeSegment::size() const noexcept{
@@ -226,7 +353,7 @@ SuccessSegment::SuccessSegment(unsigned int id) :
 std::string SuccessSegment::debug_string() const {
   std::stringstream ss;
   ss <<
-  ".section_" << id() << ":  ; success" << std::endl <<
+  ".section_" << id() << ":  // success" << std::endl <<
   "    mov $01, %rax" << std::endl <<
   "    pop %rbp" << std::endl <<
   "    retq" << std::endl;
@@ -245,7 +372,7 @@ FailureSegment::FailureSegment(unsigned int id) :
 std::string FailureSegment::debug_string() const {
   std::stringstream ss;
   ss <<
-  ".section_" << id() << ":  ; failure" << std::endl <<
+  ".section_" << id() << ":  // failure" << std::endl <<
   "    xor %eax, %eax" << std::endl <<
   "    pop %rbp" << std::endl <<
   "    retq" << std::endl;

@@ -295,3 +295,34 @@ is two bytes. If *every* section between this one and the one we need reached
 its max size and we're still in distance, then we can safely make this one
 smaller. I like that idea. Instructions now present a max_size before they're
 set and then a size after.
+
+11/2/2020
+
+So I think I've got the assembly portion almost done. I can actually generate
+a full set of snippets that should be able to create a universal set of regexes.
+They're not the most efficient ones, but we'll get there soon enough.
+
+11/8/2020
+
+Sorry I was gone for so long. I was agonizing over the soul of America. We're
+not out of the woods yet, but things are looking a little better.
+
+The next thing I need to look at, as I recall, is that my offset calculations
+may be a little bit off. I assembled one of my examples and found that the
+offset in one of the `jmp` instructions doesn't agree with the offset that I
+generate with my code.
+
+I should be doing this:
+
+```
+   f:   74 09                   je     1a <.section_5>
+```
+
+But I'm actually generating this `74 0a`, so I'm off by one. Something's not
+quite right.
+
+Okay, turns out I just miscounted the offset in the parent segment. That should
+be sorted now.
+
+And now the the whole binary seems to match. Cool deal. I think the next step is
+to refactor so that the other complicated section reuses this jump logic.
