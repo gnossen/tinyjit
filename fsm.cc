@@ -139,6 +139,15 @@ Fsm::ToDotGraph() const {
     return ss.str();
 }
 
+static bool HasOneTransitionAndElse(Fsm::TransitionContainer& transitions) {
+  size_t transition_count = std::distance(transitions.begin(), transitions.end());
+  if (transition_count != 2) {
+    return false;
+  }
+  auto transition = ++transitions.begin();
+  return transition->second.remainder;
+}
+
 Fsm ToBinarizedNfsm(Fsm& original) {
   // Each state in the input graph will have a corresponding state in the
   // output graph, so we start by copying those over.
@@ -191,13 +200,15 @@ Fsm ToBinarizedNfsm(Fsm& original) {
     size_t transition_count = std::distance(transitions.begin(), transitions.end());
     if (transition_count == 0) {
       continue;
-    } else if (transition_count == 1) {
-      auto transition = transitions.begin();
-      derived.AddTransition(
-          mirror_state,
-          correspondences[original.StateIdentifier(transition->first)],
-          transition->second);
-      to_visit.push_back(transition->first);
+    } else if (transition_count == 1 || HasOneTransitionAndElse(transitions)) {
+      // Copy state
+      for (auto transition = transitions.begin(); transition != transitions.end(); ++transition) {
+        derived.AddTransition(
+            mirror_state,
+            correspondences[original.StateIdentifier(transition->first)],
+            transition->second);
+        to_visit.push_back(transition->first);
+      }
     } else {
       // TODO: If there's an immediate loop, prioritize that and don't make an
       // extra state for it. We can use `repe scasb` for it.
