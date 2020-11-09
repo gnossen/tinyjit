@@ -122,48 +122,6 @@ private:
   static const uint8_t kCode[];
 };
 
-// Consumes a single character if there's a match and jumps to the specified
-// section. Otherwise, does not consume a character and continues to the next
-// section.
-class ConsumingMatchNonConsumingNonMatch : public AssemblySegment {
-public:
-
-  ConsumingMatchNonConsumingNonMatch(unsigned int index,
-                                     char letter, unsigned int jmp_index) noexcept :
-    index_(index),
-    letter_(letter),
-    jmp_index_(jmp_index),
-    offset_size_(0),
-    relative_offset_(0) {}
-
-  void write_code(uint8_t** code) const noexcept override;
-
-  void determine_size(const OffsetInterface* offset_if) noexcept override;
-
-  void determine_offset(const OffsetInterface* offset_if) noexcept override;
-
-  std::string debug_string() const override;
-  size_t size() const noexcept override;
-
-  size_t max_size() const noexcept override;
-
-  unsigned int id() const override {
-    return index_;
-  }
-
-private:
-  static const uint8_t kCodeRel8[];
-
-  static const uint8_t kCodeRel16Or32[];
-
-  // TODO: Rename to id_.
-  unsigned int index_;
-  char letter_;
-  unsigned int jmp_index_;
-  size_t offset_size_;
-  int32_t relative_offset_;
-};
-
 // This segment is not stored in an AssemblySubroutine and therefore
 // it does not have its own index. It is only used within the context of a
 // *parent* segment.
@@ -209,6 +167,45 @@ private:
 
   size_t offset_size_;
   int32_t relative_offset_;
+};
+
+// Consumes a single character if there's a match and jumps to the specified
+// section. Otherwise, does not consume a character and continues to the next
+// section.
+class ConsumingMatchNonConsumingNonMatch : public AssemblySegment {
+public:
+
+  ConsumingMatchNonConsumingNonMatch(unsigned int index,
+                                     char letter, unsigned int jmp_index) noexcept :
+    index_(index),
+    letter_(letter),
+    jmp_index_(jmp_index),
+    jmp_segment_(index, 3, jmp_index) {}
+
+  void write_code(uint8_t** code) const noexcept override;
+
+  void determine_size(const OffsetInterface* offset_if) noexcept override;
+
+  void determine_offset(const OffsetInterface* offset_if) noexcept override;
+
+  std::string debug_string() const override;
+  size_t size() const noexcept override;
+
+  size_t max_size() const noexcept override;
+
+  unsigned int id() const override {
+    return index_;
+  }
+
+private:
+  static const uint8_t kCodePreamble[];
+  static const uint8_t kCodeConclusion[];
+
+  // TODO: Rename to id_.
+  unsigned int index_;
+  char letter_;
+  unsigned int jmp_index_;
+  JumpEqualSegment jmp_segment_;
 };
 
 // Consumes a single character. If there's a match, continue to the next

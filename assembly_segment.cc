@@ -76,112 +76,53 @@ std::string AssemblySubroutine::debug_string() const {
 
 const uint8_t NoOp::kCode[] = {};
 
-const uint8_t ConsumingMatchNonConsumingNonMatch::kCodeRel8[] = {
+const uint8_t ConsumingMatchNonConsumingNonMatch::kCodePreamble[] = {
   0xb0, 0x00,       // mov LETTER, %al
-  0xae,             // scas
-  0x74, 0x00,       // je .section_X
-  0x48, 0xff, 0xcf  // dec %rdi
+  0xae              // scas
 };
 
-const uint8_t ConsumingMatchNonConsumingNonMatch::kCodeRel16Or32[] = {
-  0xb0, 0x00,                         // mov LETTER, %al
-  0xae,                               // scas
-  0x0f, 0x84, 0x00, 0x00, 0x00, 0x00, // je .section_X ; rel16 or rel32
-  0x48, 0xff, 0xcf                    // dec %rdi
+const uint8_t ConsumingMatchNonConsumingNonMatch::kCodeConclusion[] = {
+  0x48, 0xff, 0xcf  // dec %rdi
 };
 
 void ConsumingMatchNonConsumingNonMatch::write_code(
     uint8_t** code) const noexcept {
-
-  // NOTE: We rely on the compiling and target architecture being the same for
-  // both endianness and for two's complement representation.
-  if (offset_size_ == 8) {
-    const int8_t offset = relative_offset_;
-    memcpy(*code, kCodeRel8, sizeof(kCodeRel8));
-    ((char*)*code)[1] = letter_;
-    ((int8_t*)*code)[4] = offset;
-    *code += sizeof(kCodeRel8);
-  } else if (offset_size_ == 16 || offset_size_ == 32) {
-    const int32_t offset = relative_offset_;
-    memcpy(*code, kCodeRel16Or32, sizeof(kCodeRel16Or32));
-    ((char*)*code)[1] = letter_;
-    ((int32_t*)*code)[5] = offset;
-    *code += sizeof(kCodeRel16Or32);
-  } else {
-    std::cerr << "write_code() called before determine_size()." << std::endl;
-    exit(1);
-  }
+  memcpy(*code, kCodePreamble, sizeof(kCodePreamble));
+  ((char*)*code)[1] = letter_;
+  *code += sizeof(kCodePreamble);
+  jmp_segment_.write_code(code);
+  memcpy(*code, kCodeConclusion, sizeof(kCodeConclusion));
+  *code += sizeof(kCodeConclusion);
 }
 
-// TODO: Replace with JumpEqualSegment.
 void ConsumingMatchNonConsumingNonMatch::determine_size(
     const OffsetInterface* offset_if) noexcept
 {
-  const size_t max_inter_segment_distance = offset_if->maximum_distance(index_, jmp_index_);
-
-  // Offset is relative to the end of the jump statement.
-  const size_t max_intra_segment_distance = 9;
-  const size_t max_distance = max_inter_segment_distance + max_intra_segment_distance;
-  if (max_distance < k8BitMax) {
-    offset_size_ = 8;
-  } else if (max_distance < k16BitMax) {
-    offset_size_ = 16;
-  } else if (max_distance < k32BitMax) {
-    offset_size_ = 32;
-  } else {
-    std::cerr << "Encountered offset " << max_distance << "not representable with 32 bits." << std::endl;
-    exit(1);
-  }
+  jmp_segment_.determine_size(offset_if);
 }
 
 void ConsumingMatchNonConsumingNonMatch::determine_offset(
     const OffsetInterface* offset_if) noexcept
 {
-  const size_t this_segment_start = offset_if->absolute_offset(index_);
-  const size_t other_segment_start = offset_if->absolute_offset(jmp_index_);
-  if (offset_size_ == 8) {
-    const size_t jmp_relative = this_segment_start + 5;
-    relative_offset_ = other_segment_start - jmp_relative;
-  } else if (offset_size_ == 16 || offset_size_ == 32) {
-    const size_t jmp_relative = this_segment_start + 9;
-    relative_offset_ = other_segment_start - jmp_relative;
-  } else {
-    std::cerr << "determine_offset() called before determine_size()." << std::endl;
-    exit(1);
-  }
+  jmp_segment_.determine_offset(offset_if);
 }
 
 size_t ConsumingMatchNonConsumingNonMatch::max_size() const noexcept {
-  // TODO: There are fancy things we can do to make this smaller under certain
-  // circumstances.
-  return sizeof(kCodeRel16Or32);
+  return sizeof(kCodePreamble) + sizeof(kCodeConclusion) + jmp_segment_.max_size();
 }
 
 size_t ConsumingMatchNonConsumingNonMatch::size() const noexcept {
-  if (offset_size_ == 8) {
-    return sizeof(kCodeRel8);
-  } else if (offset_size_ == 16 || offset_size_ == 32) {
-    return sizeof(kCodeRel16Or32);
-  } else {
-    std::cerr << "size() called before determine_size()." << std::endl;
-    exit(1);
-  }
+  return sizeof(kCodePreamble) + sizeof(kCodeConclusion) + jmp_segment_.size();
 }
 
 std::string ConsumingMatchNonConsumingNonMatch::debug_string() const {
-  if  (offset_size_ == 0 || relative_offset_ == 0) {
-    std::cerr << "debug_string() called before determine_offset()." << std::endl;
-    exit(1);
-  }
-
   std::stringstream ss;
   ss <<
   ".section_" << index_ << ":" << std::endl <<
   "    mov $0x" << std::hex << (unsigned int)letter_ <<
       std::dec << ", %al  // '" << letter_ << "'" <<  std::endl <<
   "    scasb" << std::endl <<
-  "    je .section_" << jmp_index_ <<  "  // Offset 0x" <<
-      std::hex << relative_offset_  << std::dec << std::endl <<
+  jmp_segment_.debug_string() <<
   "    dec %rdi" << std::endl;
   return ss.str();
 }
