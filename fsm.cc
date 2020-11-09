@@ -9,8 +9,6 @@
 namespace gnossen {
 namespace fsm {
 
-static constexpr size_t kMaxElseSize = 5;
-
 static std::string TranslateLetter(char letter) {
     if (letter == '\0') {
         return "\\\\0";
@@ -112,14 +110,7 @@ Fsm::ToDotGraph() const {
             EdgeLabel label = transition->second;
             std::string transition_str;
             if (label.remainder) {
-                // Only enumerate all others if it's reasonably small.
-                if (GetAlphabet().size() <= kMaxElseSize) {
-                    for (char remaining_letter : remaining_letters) {
-                        edges[out_id].push_back(TranslateLetter(remaining_letter));
-                    }
-                } else {
-                    edges[out_id].push_back("else");
-                }
+                edges[out_id].push_back("else");
                 break;
             } else if (label.empty_edge) {
                 transition_str = "eps.";
@@ -212,15 +203,19 @@ Fsm ToBinarizedNfsm(Fsm& original) {
       // extra state for it. We can use `repe scasb` for it.
       auto previous_state = mirror_state;
       for (auto transition = transitions.begin(); transition != transitions.end(); ++transition) {
-        auto current_state = derived.AddState();
-        derived.AddNonDeterministicTransition(previous_state, current_state);
-        derived.AddTransition(
-            current_state,
-            correspondences[original.StateIdentifier(transition->first)],
-            transition->second);
-        previous_state = current_state;
+        if (transition->second.remainder)  {
+          derived.AddTransitionForRemaining(previous_state, transition->first);
+        } else {
+          auto current_state = derived.AddState();
+          derived.AddNonDeterministicTransition(previous_state, current_state);
+          derived.AddTransition(
+              current_state,
+              correspondences[original.StateIdentifier(transition->first)],
+              transition->second);
+          previous_state = current_state;
 
-        to_visit.push_back(transition->first);
+          to_visit.push_back(transition->first);
+        }
       }
     }
   }

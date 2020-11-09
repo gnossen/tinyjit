@@ -169,5 +169,8 @@ private:
 
 Fsm ToBinarizedNfsm(Fsm& fsm);
 
+// // TODO: Check for copy elision and if we don't get it, return unique_ptr.
+// AssemblySubroutine ToSubroutine(Fsm& fsm);
+
 } // end namespace fsm
 } // end namespace gnosse

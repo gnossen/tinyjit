@@ -149,6 +149,33 @@ TEST(FsmTest, ToBinarizedFsm) {
   } while (!to_visit.empty());
 }
 
+TEST(FsmTest, ToAssembly) {
+  std::vector<char> alphabet {'a', 'b', 'c'};
+  std::vector<char> extended_alphabet {'a', 'b', 'c', '\0'};
+  Fsm fsm(extended_alphabet);
+  auto initial_state = fsm.GetStartState();
+  auto state2 = fsm.AddState();
+  fsm.AddTransition(initial_state, state2, 'c');
+  fsm.AddTransitionForRemaining(initial_state, fsm.GetFailureState());
+  fsm.AddTransition(state2, state2, 'a');
+  fsm.AddTransition(state2, state2, 'b');
+  auto state3 = fsm.AddState();
+  fsm.AddTransition(state2, state3, 'c');
+  fsm.AddTransitionForRemaining(state2, fsm.GetFailureState());
+  auto state4 = fsm.AddState();
+  for (char letter : alphabet) {
+    fsm.AddTransition(state3, state4, letter);
+  }
+  fsm.AddTransitionForRemaining(state3, fsm.GetFailureState());
+  fsm.AddTransition(state4, fsm.GetSuccessState(), '\0');
+  fsm.AddTransitionForRemaining(state4, fsm.GetFailureState());
+
+  Fsm binarized_fsm = ToBinarizedNfsm(fsm);
+  WriteDotFile(binarized_fsm, "assembly_input.dot");
+  // AssemblySubroutine subroutine = ToSubroutine(binarized_fsm);
+  //Tstd::cout << subroutine.debug_string() << std::endl;
+}
+
 } // end namespace
 
 } // end namespace fsm

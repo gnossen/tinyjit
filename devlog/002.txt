@@ -326,3 +326,25 @@ be sorted now.
 
 And now the the whole binary seems to match. Cool deal. I think the next step is
 to refactor so that the other complicated section reuses this jump logic.
+
+Okay. I think I get to do a fun part next. Converting a graph to assembly. Now
+where should I put that? I think for the moment, I'm going to put it in the FSM
+test file since it's going to have to incur a dependency on the assembly code in
+order to make the implementation happen anyway.
+
+I have to say. I'm really digging this whole "produce artifacts as part of the
+test" thing.
+
+That's going to complete a big chunk of the pipeline.
+
+So I went ahead and started writing that test for conversion from FSM to
+assembly. I realized that I haven't added in the failure cases to my graphs yet,
+so I went ahead and added those to the previous test I had. I'm finding that
+there are a couple bugs. It looks like we're adding unnecessary intermediary
+states for the "else" transitions and the transitions themselves look like they
+may be labelled incorrectly by the dot graph generator. I think this was a
+problem on my end. Once you add in nondeterminstic transitions, the assumption
+that the characters triggering an else clause can be determined from a single
+state is no longer good. Let's fix the former problem first since it's not
+simply cosmetic.
+
